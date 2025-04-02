@@ -1,5 +1,16 @@
 
 import time
+
+CUDA_AVAILABLE = True
+try:
+    # 判断 torch 和 cuda 是否可用
+    import torch
+    assert torch.cuda.is_available()
+    CUDA_AVAILABLE = True
+except ImportError:
+    # print("torch is not installed, cuda_sync will be ignored.")
+    CUDA_AVAILABLE = False
+
 TAG_LEN = 8
 class Record:
     def __init__(self):
@@ -43,16 +54,8 @@ class Analysis:
         if cuda_sync == False:
             self.cuda_sync = False
             return
-        try:
-            # 判断 torch 和 cuda 是否可用
-            import torch
-            assert torch.cuda.is_available()
-        except ImportError:
-            print("torch is not installed, cuda_sync will be ignored.")
-            self.cuda_sync = False
-            return
 
-        self.cuda_sync = cuda_sync
+        self.cuda_sync = cuda_sync and CUDA_AVAILABLE
     
     def _sync(self):
         if self.cuda_sync:
