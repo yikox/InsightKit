@@ -13,4 +13,15 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3'
     ],
+    install_requires=[
+        "Pillow",
+        "numpy",
+        "opencv-python",
+        "scikit-image",
+    ],
+    entry_points={
+        "console_scripts": [
+            "diff_picture = insight_kit:diff_picture",  
+        ]
+    },
 )

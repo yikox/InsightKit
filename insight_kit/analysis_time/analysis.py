@@ -28,6 +28,7 @@ class Analysis:
         self.a_tag = atag # analysis tag
         self.current_tag = [] # stack of tags
         self.close_flag = False
+        self.cuda_sync = False
     
     def close(self):
         self.close_flag = True
@@ -38,10 +39,31 @@ class Analysis:
         self.a_tag = atag
         self.parent_tag = self.a_tag
 
+    def set_cuda_sync(self, cuda_sync):
+        if cuda_sync == False:
+            self.cuda_sync = False
+            return
+        try:
+            # 判断 torch 和 cuda 是否可用
+            import torch
+            assert torch.cuda.is_available()
+        except ImportError:
+            print("torch is not installed, cuda_sync will be ignored.")
+            self.cuda_sync = False
+            return
+
+        self.cuda_sync = cuda_sync
+    
+    def _sync(self):
+        if self.cuda_sync:
+            torch.cuda.synchronize()
+        
+
     def begin_record(self, name):
         if self.close_flag:
             return
         tag= self.parent_tag + "/" + name
+        self._sync()
         t = time.time()
         if tag in self.records.keys():
             record = self.records[tag]
@@ -58,6 +80,7 @@ class Analysis:
     def end_record(self,name = None):
         if self.close_flag:
             return
+        self._sync()
         t = time.time()
         if len(self.current_tag) == 0:
             print("Error: No tag to end")
