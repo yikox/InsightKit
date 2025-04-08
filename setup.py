@@ -18,10 +18,12 @@ setup(
         "numpy",
         "opencv-python",
         "scikit-image",
+        "psutil"
     ],
     entry_points={
         "console_scripts": [
             "diff_picture = insight_kit:diff_picture",  
+            "monitor = insight_kit:monitor",
         ]
     },
 )
