@@ -130,6 +130,7 @@ class SystemMonitor:
 def monitor():
     parser = argparse.ArgumentParser(description='系统监控工具')
     parser.add_argument('--interval', type=float, help='输入整数', default=0.25)
+    parser.add_argument('--output-file', type=str, help='输出文件名', default='system_stats.csv')
     args = parser.parse_args()
     
     """系统监控入口函数"""
