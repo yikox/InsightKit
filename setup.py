@@ -18,7 +18,8 @@ setup(
         "numpy",
         "opencv-python",
         "scikit-image",
-        "psutil"
+        "psutil",
+        "pynvml"
     ],
     entry_points={
         "console_scripts": [
