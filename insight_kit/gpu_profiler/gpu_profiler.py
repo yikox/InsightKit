@@ -62,7 +62,8 @@ class GPUProfiler:
         """保存采集数据到 CSV 文件"""
         with open(self.output_file, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(["Time", "Elapsed(s)", "GPU_Util(%)", "Memory_Used(MiB)", "Memory_Total(MiB)"])
+            writer.writerow(["Time", "Elapsed(s)", "GPU_Util(%)", "Memory_BW_Util(%)", \
+                             "Memory_Used(MiB)", "Memory_Total(MiB)", "Memory_Percent(%)"])
             writer.writerows(self.data)
         print(f"✅ 数据已保存到 {self.output_file}")
 
