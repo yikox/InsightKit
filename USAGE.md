@@ -85,12 +85,33 @@ def preprocess(): ...
 def postprocess(): ...
 ```
 
+#### 范围式打点
+
+`@at_scope` 把一次调用标记为一轮独立实验：**进入时 `reset` 清空历史数据，正常或异常退出时自动打印本轮统计**，省去手写 `reset` / `print(AT)` 样板。
+
+```python
+from insight_kit import AT, at_scope
+
+@at_scope("my_exp")                      # tag 可选；省略时用函数名
+def run_exp():
+    AT.begin_record("Main")
+    preprocess()
+    AT.end_record("Main")
+
+run_exp()                                # 退出时自动打印树状统计
+```
+
+- `print_result=False` 可关闭自动打印；`save_to="analysis.txt"` 退出时顺带保存。
+- ⚠️ `AT` 是全局单例，进入 scope 会清空此前全部数据——请只用在「一次实验的入口函数」上，不要在嵌套的内部函数上使用。
+
 #### 常用 API
 
 | API | 说明 |
 |---|---|
 | `AT.begin_record(name)` | 开始计时，入栈 |
 | `AT.end_record(name=None)` | 结束计时，出栈；name 可选用于校验匹配 |
+| `@at_record` / `@at_record(tag)` | 装饰器：包裹函数体计时 |
+| `@at_scope` / `@at_scope(tag)` | 装饰器：进入即 `reset`，退出自动打印（可 `save_to=`） |
 | `AT.reset(tag="AT")` | 清空全部记录并重置根标签 |
 | `AT.close()` | 关闭计时（后续打点全部忽略，零开销） |
 | `AT.set_cuda_sync(True)` | 打点前后 `torch.cuda.synchronize()`，计时更准（需 torch + CUDA） |

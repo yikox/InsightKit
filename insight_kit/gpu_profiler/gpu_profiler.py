@@ -5,11 +5,16 @@ import threading
 try:
     from ..device.nvidia_info import NvidiaInfo
 except ImportError:
-    print("NvidiaInfo module not found. Please ensure the module is available.")
-    exit(1)
+    # 缺少 pynvml / NVIDIA 驱动时不中断 import，仅在实际使用时报错
+    NvidiaInfo = None
 class GPUProfiler:
     """封装 GPU 监控工具，支持开始、结束、保存数据"""
     def __init__(self, interval=0.25, output_file="gpu_stats.csv"):
+        if NvidiaInfo is None:
+            raise RuntimeError(
+                "GPUProfiler 需要 pynvml 与 NVIDIA 驱动；请安装 `pip install pynvml` "
+                "并在有 NVIDIA GPU 的机器上运行"
+            )
         self.interval = interval
         self.output_file = output_file
         self.data = []

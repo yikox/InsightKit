@@ -1,15 +1,13 @@
 
 import time
 
-CUDA_AVAILABLE = True
+# 判断 torch 和 cuda 是否可用；不可用时 cuda_sync 自动跳过
+CUDA_AVAILABLE = False
 try:
-    # 判断 torch 和 cuda 是否可用
     import torch
-    assert torch.cuda.is_available()
-    CUDA_AVAILABLE = True
+    CUDA_AVAILABLE = torch.cuda.is_available()
 except ImportError:
-    # print("torch is not installed, cuda_sync will be ignored.")
-    CUDA_AVAILABLE = False
+    pass
 
 TAG_LEN = 8
 class Record:
@@ -29,8 +27,13 @@ class Record:
         
 
     def __str__(self):
-        self.avg = sum(self.recore_lst) / self.count
-        return f"{self.name[:self.tag_len].ljust(self.tag_len)}: Count: {self.count}, Avg: {self.avg:.4f}"
+        if self.count > 0:
+            self.avg = sum(self.recore_lst) / self.count
+            avg_str = f"{self.avg:.4f}"
+        else:
+            # 记录仍在进行中（未 end_record，如异常中断），无平均可算
+            avg_str = "-"
+        return f"{self.name[:self.tag_len].ljust(self.tag_len)}: Count: {self.count}, Avg: {avg_str}"
 
 class Analysis:
     def __init__(self, atag="AT"):
