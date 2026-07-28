@@ -7,7 +7,7 @@ def block_a():
     time.sleep(0.05)
 
 
-@at_scope("my_exp")          # 进入即 reset，退出自动 print(AT)
+@at_scope("my_exp")          # 独立实验：退出自动 print(AT)，且不破坏外部历史数据
 def run_exp():
     AT.begin_record("Main")
     block_a()
@@ -31,3 +31,4 @@ if __name__ == "__main__":
         failing_exp()       # 异常退出也会先打印本轮已有的统计，再抛出
     except RuntimeError:
         pass
+    run_exp()               # 多次调用安全：每轮独立，互不污染

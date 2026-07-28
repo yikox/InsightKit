@@ -1,10 +1,13 @@
 import importlib
 import importlib.util
 import inspect
+import logging
 import types
 from contextvars import ContextVar
 
 from .analysis import AT
+
+logger = logging.getLogger("insight_kit.auto_decorate")
 
 PIPELINE_TYPES = []
 
@@ -188,11 +191,17 @@ def auto_install(pipeline_types=None, process_names=None):
         process_names = PROCESS_NAMES
     caller_globals = _find_importer_globals()
     if not caller_globals:
+        logger.warning(
+            "auto_install() 未找到调用方全局变量（函数内 import？）；未做任何包裹"
+        )
         return False
+    wrapped = False
     for name in process_names:
         process_func = caller_globals.get(name)
         if callable(process_func):
             caller_globals[name] = _wrap_process(process_func)
+            logger.info("auto_install() 已包裹 Process 函数 %r", name)
+            wrapped = True
             break
     if pipeline_types:
         pipeline = _find_pipeline(caller_globals, pipeline_types)
@@ -203,7 +212,10 @@ def auto_install(pipeline_types=None, process_names=None):
                 parent[attr_name] = wrapped_pipe
             else:
                 setattr(parent, attr_name, wrapped_pipe)
-    return True
-
-
-auto_install()
+            logger.info("auto_install() 已包裹 pipeline %r", attr_name)
+            wrapped = True
+    if not wrapped:
+        logger.warning(
+            "auto_install() 未在调用方全局变量中找到 Process 函数或 pipeline，未做任何包裹"
+        )
+    return wrapped

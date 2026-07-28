@@ -3,57 +3,57 @@ import functools
 
 from .analysis import AT
 
+
 def at_record(arg):
-    if callable(arg):
-        # 没有参数的情况：tag是函数名, arg 就是 func
-        func = arg
-        @functools.wraps(func)
-        def decorator(*args, **kwargs):
-            AT.begin_record(func.__name__)
-            try:
-                return func(*args, **kwargs)
-            finally:
-                AT.end_record(func.__name__)
+    """装饰器：把整个函数体作为一次计时记录。
+
+    支持裸用（``@at_record``，tag 取函数名）和带标签（``@at_record("自定义")``）。
+    内部基于 ``with AT.record(...)``，函数抛异常时也会正确结束计时。
+    """
+    def wrapper(tag):
+        def decorator(func):
+            @functools.wraps(func)
+            def wrapper_fn(*args, **kwargs):
+                with AT.record(tag):
+                    return func(*args, **kwargs)
+            return wrapper_fn
         return decorator
 
-    else:
-        # 带参数的情况：tag是参数
-        name = arg
-        def wrapper(func):
-            @functools.wraps(func)
-            def decorator(*args, **kwargs):
-                AT.begin_record(name)
-                try:
-                    return func(*args, **kwargs)
-                finally:
-                    AT.end_record(name)
-            return decorator
-        return wrapper
+    if callable(arg):
+        # 裸用：@at_record，tag 取函数名
+        return wrapper(arg.__name__)(arg)
+    # 带参：@at_record("自定义标签")
+    return wrapper(arg)
 
 
 def at_scope(arg=None, *, print_result=True, save_to=None):
-    """把一次函数调用标记为一轮独立的计时范围。
+    """装饰器：把一次函数调用标记为一轮独立实验。
 
-    进入时 ``AT.reset(tag)`` 清空全部历史数据，正常或异常退出时
-    在 ``finally`` 里输出 / 保存本轮统计结果。
+    基于 ``with AT.experiment(tag)``：
+    - 进入时对本轮统计使用独立根标签，**不影响也不清空**调用前的历史数据；
+    - 正常或异常退出时，先输出/保存本轮统计，再自动恢复历史数据。
+
+    因此它可以安全地多次调用、嵌套使用——此前版本会 ``reset()`` 掉全局
+    数据的副作用已移除。
 
     支持裸用（``@at_scope``，tag 取函数名）和带参数（``@at_scope("exp1")``）。
-
-    注意：``AT`` 是全局单例，进入 scope 会清空此前所有累计数据；
-    请仅在"一次实验的入口函数"上使用该装饰器，不要在嵌套的内部函数上使用。
+    ``print_result=False`` 关闭自动打印；``save_to="path"`` 退出时顺带保存。
     """
     def wrapper(func):
         tag = arg if isinstance(arg, str) else func.__name__
+
         @functools.wraps(func)
         def decorator(*args, **kwargs):
-            AT.reset(tag)
-            try:
-                return func(*args, **kwargs)
-            finally:
-                if print_result:
-                    print(AT)
-                if save_to is not None:
-                    AT.save(save_to)
+            with AT.experiment(tag):
+                try:
+                    return func(*args, **kwargs)
+                finally:
+                    # 异常路径下也先落盘/打印本轮已有的统计
+                    if print_result:
+                        print(AT)
+                    if save_to is not None:
+                        AT.save(save_to)
+
         return decorator
 
     if callable(arg):

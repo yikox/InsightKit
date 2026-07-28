@@ -7,7 +7,7 @@ InsightKit 是一个面向算法性能分析与调优的 Python 工具包，提�
 ### 方式 1：安装编译好的 whl（推荐）
 
 ```bash
-pip install dist/insight_kit-0.0.2-py3-none-any.whl
+pip install dist/insight_kit-0.0.4-py3-none-any.whl
 ```
 
 ### 方式 2：从 Git 仓库直接安装
@@ -60,18 +60,30 @@ for _ in range(10):
     AT.end_record("Sub2")
 AT.end_record("Main")
 
-print(AT)                      # 树状打印各节点 Count / Avg
+print(AT)                      # 树状打印各节点 Count / Avg / Min / Max / Total
 AT.save("analysis.txt")        # 保存到文件
+```
+
+**推荐用上下文管理器**（v0.0.4+）：无需手动配对 `begin`/`end`，块内抛异常也能正确结束计时——忘记 `end_record` 导致数据静默错乱的老问题从此消失：
+
+```python
+from insight_kit import AT
+
+with AT.record("Main"):        # 进入即计时，退出即结束，异常安全
+    with AT.record("Sub"):
+        ...
 ```
 
 输出示例：
 
 ```
 Analysis Tag: AT
-Main      : Count: 1, Avg: 1.2035
-    Sub1  : Count: 1, Avg: 0.1002
-    Sub2  : Count: 10, Avg: 0.0101
+Main      : Count: 1, Avg: 1.2035, Min: 1.2035, Max: 1.2035, Total: 1.2035
+    Sub1  : Count: 1, Avg: 0.1002, Min: 0.1002, Max: 0.1002, Total: 0.1002
+    Sub2  : Count: 10, Avg: 0.0101, Min: 0.0100, Max: 0.0102, Total: 0.1010
 ```
+
+> 无数据时 `print(AT)` 输出 `(empty)`，绝不出错、绝不修改内部状态。
 
 #### 装饰器打点
 
@@ -85,9 +97,9 @@ def preprocess(): ...
 def postprocess(): ...
 ```
 
-#### 范围式打点
+#### 实验式打点（at_scope / experiment）
 
-`@at_scope` 把一次调用标记为一轮独立实验：**进入时 `reset` 清空历史数据，正常或异常退出时自动打印本轮统计**，省去手写 `reset` / `print(AT)` 样板。
+`@at_scope` 把一次调用标记为一轮独立实验：**正常或异常退出时自动打印本轮统计**，省去手写 `print(AT)` 样板。v0.0.4 起底层改用**快照-恢复**语义：实验块内的打点不会污染调用前的历史数据，实验结束后历史自动还原——**可安全多次调用、嵌套使用**。
 
 ```python
 from insight_kit import AT, at_scope
@@ -98,24 +110,41 @@ def run_exp():
     preprocess()
     AT.end_record("Main")
 
-run_exp()                                # 退出时自动打印树状统计
+run_exp()                                # 退出时自动打印本轮树状统计
+run_exp()                                # 每轮相互独立，结果互不污染
+```
+
+不用装饰器时，可用等价的上下文管理器只包裹一段代码：
+
+```python
+from insight_kit import AT
+
+with AT.experiment("exp1"):              # 块内看到的是纯本轮数据
+    with AT.record("Main"):
+        ...
+    print(AT)                            # 打印本轮（或用 save_to=）
+# 退出后，全局历史数据自动恢复
 ```
 
 - `print_result=False` 可关闭自动打印；`save_to="analysis.txt"` 退出时顺带保存。
-- ⚠️ `AT` 是全局单例，进入 scope 会清空此前全部数据——请只用在「一次实验的入口函数」上，不要在嵌套的内部函数上使用。
 
 #### 常用 API
 
 | API | 说明 |
 |---|---|
+| `with AT.record(name):` | **推荐**：代码块计时，异常安全，无需手动配对 |
 | `AT.begin_record(name)` | 开始计时，入栈 |
-| `AT.end_record(name=None)` | 结束计时，出栈；name 可选用于校验匹配 |
-| `@at_record` / `@at_record(tag)` | 装饰器：包裹函数体计时 |
-| `@at_scope` / `@at_scope(tag)` | 装饰器：进入即 `reset`，退出自动打印（可 `save_to=`） |
-| `AT.reset(tag="AT")` | 清空全部记录并重置根标签 |
+| `AT.end_record(name=None)` | 结束计时，出栈；name 不匹配时忽略本次调用并告警（不污染栈状态） |
+| `@at_record` / `@at_record(tag)` | 装饰器：包裹函数体计时（异常安全） |
+| `with AT.experiment(tag):` | 独立实验块：退出后自动恢复历史数据，可嵌套 |
+| `@at_scope` / `@at_scope(tag)` | 装饰器：独立实验，退出自动打印（可 `print_result=` / `save_to=`） |
+| `AT.to_dict()` / `AT.to_json()` | 结构化输出（树状），便于接入 wandb/tensorboard/自研分析 |
+| `AT.reset(tag="AT")` | 清空全部记录并重置根标签与计时栈 |
 | `AT.close()` | 关闭计时（后续打点全部忽略，零开销） |
-| `AT.set_cuda_sync(True)` | 打点前后 `torch.cuda.synchronize()`，计时更准（需 torch + CUDA） |
+| `AT.set_cuda_sync(True)` | 打点前后 `torch.cuda.synchronize()`，计时更准（需 torch + CUDA；不满足会告警提示） |
 | `AT.save(path)` | 保存统计结果到文本文件 |
+
+每个记录节点的统计包含 `Count / Avg / Min / Max / Total`；`to_dict()` 还额外提供 `p95`。
 
 #### diffusers Pipeline 自动打点（auto_decorate）
 
@@ -123,8 +152,10 @@ run_exp()                                # 退出时自动打印树状统计
 
 ```python
 from insight_kit.analysis_time.auto_decorate import auto_install
-auto_install()   # 扫描当前模块全局变量，包裹 Process 函数和 diffusers Pipeline
+auto_install()   # 需在模块顶层显式调用；扫描当前模块全局变量，包裹 Process 函数和 diffusers Pipeline
 ```
+
+> v0.0.4 起 import 本模块不再自动触发插桩（此前会在 import 时产生副作用），请显式调用 `auto_install()`。包裹动作会通过 `logging`（logger 名 `insight_kit.auto_decorate`）输出日志，便于排查"它到底包了什么"。
 
 也可注册自定义 pipeline 类型：`register_pipeline_type(MyPipeline)`。
 
@@ -188,5 +219,22 @@ psnr = calculate_psnr(img1, img2)
 
 ## 三、已知限制
 
-1. `auto_decorate` 的自动插桩发生在 `import insight_kit.analysis_time.auto_decorate` 时，且只对**调用方的全局变量**生效；在函数内部 import 不会扫描到目标变量。
+1. `auto_install()` 只对**调用方的模块级全局变量**生效；在函数内部调用（局部变量可见性）不会扫描到目标变量——此时会输出 warning 日志。
 2. 纯 Python 包（`py3-none-any`），但实际运行 GPU 功能依赖 NVIDIA 驱动与 `nvidia-smi`，Linux 服务器为主要目标平台。
+
+---
+
+## 四、版本变更记录
+
+### v0.0.4（当前）
+
+- **新增** `with AT.record(name)` 上下文管理器：异常安全、无需手动配对 `begin`/`end`。
+- **新增** `with AT.experiment(tag)` 与 `@at_scope` 的快照-恢复语义：实验轮次不再清空全局历史数据，可安全嵌套 / 多次调用。
+- **新增** `AT.to_dict()` / `AT.to_json()` 结构化输出（含 p95），可直接接入 wandb/tensorboard。
+- **改进** 输出增加 `Min / Max / Total` 统计；`print(AT)` 不再有任何副作用（此前的致命缺陷：`__str__` 出错会静默清空全部数据）。
+- **修复** `end_record` tag 不匹配时状态栈被永久污染的问题（现在忽略本次调用并发出 `warnings` 告警）。
+- **修复** `reset` 未清空计时栈的问题；重复 `begin` 同一记录、栈空 `end` 等误用均改为 `warnings` 告警而非静默。
+- **改进** `set_cuda_sync(True)` 在缺 torch/CUDA 的环境下会告警提示已跳过同步。
+- **变更** `auto_decorate` 不再在 import 时自动插桩，需显式 `auto_install()`；插桩动作有 logging 日志。
+
+> ⚠️ 行为变更：旧版 `@at_scope` 进入时会 `reset()` 清空全局数据，新版不再清空。如果你的脚本依赖这个副作用来分轮，请改用显式 `AT.reset()`。
