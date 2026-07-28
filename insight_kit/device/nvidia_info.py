@@ -8,7 +8,8 @@ class NvidiaInfo:
         :param gpu_id: GPU ID (默认监控第一个 GPU)
         """
         nvmlInit()
-        self.gpu_handle = nvmlDeviceGetHandleByIndex(0)  # 默认监控第一个 GPU
+        self.gpu_id = gpu_id
+        self.gpu_handle = nvmlDeviceGetHandleByIndex(gpu_id)
     def get_gpu_util_info(self):
         """
         获取 GPU 利用率、显存带宽

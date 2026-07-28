@@ -119,9 +119,9 @@ class SystemMonitor:
         with open(self.output_file, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([
-                "Time", "Elapsed(s)", 
-                "GPU_Util(%)", "Memory_Used(MiB)", "Memory_Total(MiB)",
-                "CPU_Util(%)"
+                "Time", "Elapsed(s)",
+                "GPU_Util(%)", "GPU_Memory_Used(MiB)", "GPU_Memory_Total(MiB)",
+                "GPU_Memory_Percent(%)", "CPU_Util(%)", "CPU_Memory_Percent(%)"
             ])
             writer.writerows(self.data)
         print(f"✅ 数据已保存到 {self.output_file}")
